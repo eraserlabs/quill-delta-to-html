@@ -41,6 +41,8 @@ declare class QuillDeltaToHtmlConverter {
   _renderTableRow(row: TableRow): string;
   _renderTableCell(cell: TableCell): string;
   _renderBlock(bop: DeltaInsertOp, ops: DeltaInsertOp[]): string;
+  private _getConsecutiveCodeGroups;
+  private _getHtmlForConsecutiveCodeGroups;
   _renderInlines(ops: DeltaInsertOp[], isInlineGroup?: boolean): string;
   _renderInline(op: DeltaInsertOp, contextOp: DeltaInsertOp | null): any;
   _renderCustom(op: DeltaInsertOp, contextOp: DeltaInsertOp | null): any;

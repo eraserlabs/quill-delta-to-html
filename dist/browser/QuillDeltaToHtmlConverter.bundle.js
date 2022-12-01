@@ -802,6 +802,27 @@ var QuillDeltaToHtmlConverter = (function () {
     function QuillDeltaToHtmlConverter(deltaOps, options) {
         this.rawDeltaOps = [];
         this.callbacks = {};
+        this._getConsecutiveCodeGroups = function (ops) {
+            var output = [];
+            var isCode = function (op) { return op.attributes.code === true; };
+            var isConsecutive = function (index) {
+                var r = output[output.length - 1];
+                return !output.length ? false : r.start + r.length === index;
+            };
+            for (var i = 0; i < ops.length - 1; i++) {
+                var currentOp = ops[i];
+                if (output.length === 0 && isCode(currentOp)) {
+                    output.push({ start: i, length: 1 });
+                }
+                else if (isCode(currentOp) && isConsecutive(i)) {
+                    output[output.length - 1].length++;
+                }
+                else if (isCode(currentOp)) {
+                    output.push({ start: i, length: 1 });
+                }
+            }
+            return output.filter(function (o) { return o.length > 1; });
+        };
         this.options = obj.assign({
             paragraphTag: 'p',
             encodeHtml: true,
@@ -989,18 +1010,59 @@ var QuillDeltaToHtmlConverter = (function () {
         var inlines = ops.map(function (op) { return _this._renderInline(op, bop); }).join('');
         return htmlParts.openingTag + (inlines || BrTag) + htmlParts.closingTag;
     };
-    QuillDeltaToHtmlConverter.prototype._renderInlines = function (ops, isInlineGroup) {
+    QuillDeltaToHtmlConverter.prototype._getHtmlForConsecutiveCodeGroups = function (ops, codeGroups) {
         var _this = this;
-        if (isInlineGroup === void 0) { isInlineGroup = true; }
+        var html = '';
         var opsLen = ops.length - 1;
-        var html = ops
-            .map(function (op, i) {
+        var defaultRender = function (op, i) {
             if (i > 0 && i === opsLen && op.isJustNewline()) {
                 return '';
             }
             return _this._renderInline(op, null);
-        })
-            .join('');
+        };
+        var isInCodeGroup = function (index) {
+            if (!codeGroups.length) {
+                return false;
+            }
+            return (codeGroups[0].start <= index &&
+                index < codeGroups[0].start + codeGroups[0].length);
+        };
+        for (var i = 0; i < opsLen; i++) {
+            if (isInCodeGroup(i)) {
+                var groupHtml = '';
+                for (var j = i; j < i + codeGroups[0].length; j++) {
+                    delete ops[j].attributes.code;
+                    groupHtml += defaultRender(ops[j], j);
+                }
+                i = i + codeGroups[0].length - 1;
+                html += "<code>" + groupHtml + "</code>";
+                codeGroups.shift();
+            }
+            else {
+                html += defaultRender(ops[i], i);
+            }
+        }
+        return html;
+    };
+    QuillDeltaToHtmlConverter.prototype._renderInlines = function (ops, isInlineGroup) {
+        var _this = this;
+        if (isInlineGroup === void 0) { isInlineGroup = true; }
+        var opsLen = ops.length - 1;
+        var codeGroups = this._getConsecutiveCodeGroups(ops);
+        var html = '';
+        if (!codeGroups.length) {
+            html = ops
+                .map(function (op, i) {
+                if (i > 0 && i === opsLen && op.isJustNewline()) {
+                    return '';
+                }
+                return _this._renderInline(op, null);
+            })
+                .join('');
+        }
+        else {
+            html = this._getHtmlForConsecutiveCodeGroups(ops, codeGroups);
+        }
         if (!isInlineGroup) {
             return html;
         }

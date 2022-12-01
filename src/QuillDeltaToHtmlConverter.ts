@@ -278,16 +278,91 @@ class QuillDeltaToHtmlConverter {
     return htmlParts.openingTag + (inlines || BrTag) + htmlParts.closingTag;
   }
 
+  private _getConsecutiveCodeGroups = (ops: DeltaInsertOp[]) => {
+    const output: { start: number; length: number }[] = [];
+
+    const isCode = (op: DeltaInsertOp) => op.attributes.code === true;
+    const isConsecutive = (index: number) => {
+      const r = output[output.length - 1];
+      return !output.length ? false : r.start + r.length === index;
+    };
+
+    for (let i = 0; i < ops.length - 1; i++) {
+      const currentOp = ops[i];
+
+      if (output.length === 0 && isCode(currentOp)) {
+        output.push({ start: i, length: 1 });
+      } else if (isCode(currentOp) && isConsecutive(i)) {
+        output[output.length - 1].length++;
+      } else if (isCode(currentOp)) {
+        output.push({ start: i, length: 1 });
+      }
+    }
+
+    return output.filter((o) => o.length > 1);
+  };
+
+  private _getHtmlForConsecutiveCodeGroups(
+    ops: DeltaInsertOp[],
+    codeGroups: { start: number; length: number }[]
+  ) {
+    let html = '';
+    var opsLen = ops.length - 1;
+    const defaultRender = (op: DeltaInsertOp, i: number) => {
+      if (i > 0 && i === opsLen && op.isJustNewline()) {
+        return '';
+      }
+      return this._renderInline(op, null);
+    };
+    const isInCodeGroup = (index: number) => {
+      if (!codeGroups.length) {
+        return false;
+      }
+
+      return (
+        codeGroups[0].start <= index &&
+        index < codeGroups[0].start + codeGroups[0].length
+      );
+    };
+
+    for (let i = 0; i < opsLen; i++) {
+      if (isInCodeGroup(i)) {
+        let groupHtml = '';
+
+        for (let j = i; j < i + codeGroups[0].length; j++) {
+          delete ops[j].attributes.code;
+          groupHtml += defaultRender(ops[j], j);
+        }
+
+        i = i + codeGroups[0].length - 1;
+        html += `<code>${groupHtml}</code>`;
+        codeGroups.shift();
+      } else {
+        html += defaultRender(ops[i], i);
+      }
+    }
+
+    return html;
+  }
+
   _renderInlines(ops: DeltaInsertOp[], isInlineGroup = true) {
     var opsLen = ops.length - 1;
-    var html = ops
-      .map((op: DeltaInsertOp, i: number) => {
-        if (i > 0 && i === opsLen && op.isJustNewline()) {
-          return '';
-        }
-        return this._renderInline(op, null);
-      })
-      .join('');
+    const codeGroups = this._getConsecutiveCodeGroups(ops);
+    var html = '';
+
+    if (!codeGroups.length) {
+      html = ops
+        .map((op: DeltaInsertOp, i: number) => {
+          if (i > 0 && i === opsLen && op.isJustNewline()) {
+            return '';
+          }
+          return this._renderInline(op, null);
+        })
+        .join('');
+    } else {
+      html = this._getHtmlForConsecutiveCodeGroups(ops, codeGroups);
+    }
+
     if (!isInlineGroup) {
       return html;
     }
