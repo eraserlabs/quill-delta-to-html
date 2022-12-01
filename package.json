@@ -1,5 +1,5 @@
 {
-  "name": "quill-delta-to-html",
+  "name": "@eraserlabs/quill-delta-to-html",
   "version": "0.12.1",
   "description": "Converts Quill's delta ops to HTML",
   "main": "./dist/commonjs/main.js",
@@ -38,12 +38,12 @@
     "delta",
     "html"
   ],
-  "author": "Nihat Özer <nihatforweb@gmail.com>",
+  "authors": ["Nihat Özer <nihatforweb@gmail.com>", "Omar Sourour <omar.e.sourour@hotmail.com>"],
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/nozer/quill-delta-to-html/issues"
+    "url": "https://github.com/eraserlabs/quill-delta-to-html/issues"
   },
-  "homepage": "https://github.com/nozer/quill-delta-to-html#readme",
+  "homepage": "https://github.com/eraserlabs/quill-delta-to-html#readme",
   "nyc": {
     "include": [
       "src/**/*.ts"
